@@ -1,0 +1,56 @@
+/*
+ *
+ * Knuth-Morris-Pratt string search algorithm written in cilk++
+ * as described in Introduction to Algorithms, 2nd Edition, MIT Press.
+ *
+ *
+*/
+
+#include <iostream>
+#include <cilk.h>
+
+#define SAFE_DELETE_ARRAY(pi) if(pi) { delete[] pi; pi = 0; }
+
+using namespace std;
+
+unsigned* compute_prefix(string pattern) {
+  const unsigned m = pattern.size();
+  unsigned* pi = new unsigned[m];
+  unsigned k = 0;
+  for(unsigned q = 1; q < m; q++) {
+    while((k > 0) && (pattern.at(k) != pattern.at(q))) k = pi[k];
+    if(pattern.at(k) == pattern.at(q)) k++;
+    pi[q] = k;
+  }
+  return pi;
+  SAFE_DELETE_ARRAY(pi);
+}
+
+unsigned kmp_matcher(string text, string pattern) {
+  const unsigned n = text.size();
+  const unsigned m = pattern.size();
+  unsigned* pi;
+  pi = cilk_spawn compute_prefix(pattern);
+  cilk_sync;
+  unsigned q = 0;
+  for(unsigned i = 0; i < n; i++) {
+    while((q > 0) && (pattern.at(q) != text.at(i))) q = pi[q];
+    if(pattern.at(q) == text.at(i)) q++;
+    if(q == m) return i-m+1;
+  }
+  return -1;
+}
+
+int cilk_main() {
+  string pattern = "amazing";
+  
+  string text = "look at my horse. my horse is amazing. give it a lick";
+  
+  unsigned match;
+  match = cilk_spawn kmp_matcher(text, pattern);
+  cilk_sync;
+  
+  cout << match << "\n";
+  
+  return 0;
+}
